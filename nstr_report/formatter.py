@@ -1,5 +1,6 @@
 """Format activity into Nostr-ready text."""
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 import anthropic
@@ -8,6 +9,17 @@ from .fetcher import Activity, Topic
 
 
 NSTR_MESSAGE = "NSTR - Nothing Significant to Report"
+
+# Tag this npub when AI fails
+ADMIN_NPUB = "npub160t5zfxalddaccdc7xx30sentwa5lrr3rq4rtm38x99ynf8t0vwsvzyjc9"
+
+
+@dataclass
+class FormattedOutput:
+    """Output from formatting activity."""
+    message: str
+    ai_failed: bool = False
+    error_message: str | None = None
 
 
 def format_topic_list(activity: Activity) -> str:
@@ -89,7 +101,7 @@ Keep the summary under 280 characters if there's only 1-2 posts, otherwise keep 
     return message.content[0].text.strip()
 
 
-def format_activity(activity: Activity, anthropic_api_key: str | None = None) -> str:
+def format_activity(activity: Activity, anthropic_api_key: str | None = None) -> FormattedOutput:
     """Format activity into a Nostr-ready message.
 
     Args:
@@ -97,10 +109,10 @@ def format_activity(activity: Activity, anthropic_api_key: str | None = None) ->
         anthropic_api_key: Optional API key for Claude summary generation
 
     Returns:
-        Formatted message string
+        FormattedOutput with message and AI status
     """
     if not activity.topics:
-        return NSTR_MESSAGE
+        return FormattedOutput(message=NSTR_MESSAGE)
 
     date_str = activity.fetched_at.strftime("%Y-%m-%d")
     topic_count = len(activity.topics)
@@ -120,9 +132,35 @@ def format_activity(activity: Activity, anthropic_api_key: str | None = None) ->
                 "",
                 f"Source: {activity.source_url}",
             ]
-            return "\n".join(lines)
+            return FormattedOutput(message="\n".join(lines))
         except Exception as e:
-            print(f"Warning: Could not generate summary: {e}")
+            error_str = str(e)
+            print(f"Warning: Could not generate summary: {error_str}")
+            
+            # Generate angry message tagging admin
+            angry_msg = (
+                f"HEY nostr:{ADMIN_NPUB} YOUR BOT IS BROKEN!\n\n"
+                f"Claude API failed: {error_str}\n\n"
+                f"Fix your nstr-report config!"
+            )
+            
+            # Still generate fallback message
+            topic_word = "topic" if topic_count == 1 else "topics"
+            fallback_lines = [
+                f"BNOC Daily Summary ({date_str})",
+                "",
+                f"{topic_count} {topic_word} with activity (AI summary unavailable):",
+                "",
+                format_topic_list(activity),
+                "",
+                f"Source: {activity.source_url}",
+            ]
+            
+            return FormattedOutput(
+                message="\n".join(fallback_lines),
+                ai_failed=True,
+                error_message=angry_msg,
+            )
 
     # Fallback: simple list without AI summary
     topic_word = "topic" if topic_count == 1 else "topics"
@@ -136,4 +174,4 @@ def format_activity(activity: Activity, anthropic_api_key: str | None = None) ->
         f"Source: {activity.source_url}",
     ]
 
-    return "\n".join(lines)
+    return FormattedOutput(message="\n".join(lines))

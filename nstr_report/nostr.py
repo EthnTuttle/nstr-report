@@ -19,6 +19,10 @@ from datetime import timedelta
 PROFILE_NAME = "nstr-report"
 PROFILE_BIO = "NSTR - Nothing Significant to Report. Daily summaries of Bitcoin Network Operations Collective (bnoc.xyz) activity."
 
+# Retry settings
+MAX_RETRIES = 3
+RETRY_DELAY_SECONDS = 5
+
 
 def get_keys(private_key_hex: str) -> Keys:
     """Get Keys object from hex private key."""
@@ -70,8 +74,9 @@ async def publish_note_async(
     bunker_uri: str | None = None,
     app_key_hex: str | None = None,
     update_profile: bool = False,
+    max_retries: int = MAX_RETRIES,
 ) -> str:
-    """Publish a note to Nostr relays.
+    """Publish a note to Nostr relays with retry logic.
 
     Args:
         content: The note content to publish
@@ -80,36 +85,73 @@ async def publish_note_async(
         bunker_uri: NIP-46 bunker URI for remote signing
         app_key_hex: App keys for bunker connection
         update_profile: Whether to update the profile metadata
+        max_retries: Maximum number of retry attempts
 
     Returns:
         The event ID of the published note
+
+    Raises:
+        Exception: If publishing fails after all retries
     """
-    signer = await create_signer(private_key_hex, bunker_uri, app_key_hex)
-    client = Client(signer)
+    last_error = None
+    
+    for attempt in range(max_retries):
+        try:
+            signer = await create_signer(private_key_hex, bunker_uri, app_key_hex)
+            client = Client(signer)
 
-    # Add relays
-    for relay in relays:
-        relay_url = RelayUrl.parse(relay)
-        await client.add_relay(relay_url)
+            # Add relays
+            for relay in relays:
+                relay_url = RelayUrl.parse(relay)
+                await client.add_relay(relay_url)
 
-    # Connect to relays
-    await client.connect()
+            # Connect to relays
+            await client.connect()
+            
+            # Wait a moment for connections to establish
+            await asyncio.sleep(2)
 
-    # Optionally update profile
-    if update_profile:
-        metadata = Metadata()
-        metadata = metadata.set_name(PROFILE_NAME)
-        metadata = metadata.set_about(PROFILE_BIO)
-        await client.set_metadata(metadata)
+            # Optionally update profile
+            if update_profile:
+                metadata = Metadata()
+                metadata = metadata.set_name(PROFILE_NAME)
+                metadata = metadata.set_about(PROFILE_BIO)
+                await client.set_metadata(metadata)
 
-    # Build and publish the note
-    builder = EventBuilder.text_note(content)
-    output = await client.send_event_builder(builder)
+            # Build and publish the note
+            builder = EventBuilder.text_note(content)
+            output = await client.send_event_builder(builder)
 
-    # Disconnect
-    await client.disconnect()
+            # Check results
+            success_count = len(output.success) if output.success else 0
+            failed_count = len(output.failed) if output.failed else 0
+            
+            print(f"  Attempt {attempt + 1}: {success_count} relays succeeded, {failed_count} failed")
+            
+            if output.failed:
+                for relay_url, error in output.failed.items():
+                    print(f"    Failed: {relay_url} - {error}")
 
-    return output.id.to_hex()
+            # Disconnect
+            await client.disconnect()
+
+            # Success if at least one relay accepted the event
+            if success_count > 0:
+                return output.id.to_hex()
+            
+            # All relays failed - will retry
+            last_error = f"All {failed_count} relays failed"
+            
+        except Exception as e:
+            last_error = str(e)
+            print(f"  Attempt {attempt + 1} failed: {last_error}")
+        
+        # Wait before retry (except on last attempt)
+        if attempt < max_retries - 1:
+            print(f"  Retrying in {RETRY_DELAY_SECONDS} seconds...")
+            await asyncio.sleep(RETRY_DELAY_SECONDS)
+    
+    raise Exception(f"Failed to publish after {max_retries} attempts: {last_error}")
 
 
 def publish_note(
@@ -119,11 +161,13 @@ def publish_note(
     bunker_uri: str | None = None,
     app_key_hex: str | None = None,
     update_profile: bool = False,
+    max_retries: int = MAX_RETRIES,
 ) -> str:
     """Synchronous wrapper for publish_note_async."""
     return asyncio.run(
         publish_note_async(
-            content, relays, private_key_hex, bunker_uri, app_key_hex, update_profile
+            content, relays, private_key_hex, bunker_uri, app_key_hex, 
+            update_profile, max_retries
         )
     )
 

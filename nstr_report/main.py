@@ -71,11 +71,14 @@ def main() -> int:
     print(f"Found {len(activity.topics)} topics with activity")
 
     # Format the message
-    message = format_activity(activity, config.anthropic_api_key)
+    output = format_activity(activity, config.anthropic_api_key)
 
     if args.dry_run:
         print("\n--- Message (dry run) ---")
-        print(message)
+        print(output.message)
+        if output.ai_failed:
+            print("\n--- AI FAILED - Would also post: ---")
+            print(output.error_message)
         print("--- End message ---\n")
         return 0
 
@@ -83,7 +86,7 @@ def main() -> int:
     print(f"Publishing to {len(config.relays)} relays...")
     try:
         event_id = publish_note(
-            content=message,
+            content=output.message,
             relays=config.relays,
             private_key_hex=config.private_key_hex,
             bunker_uri=config.bunker_uri,
@@ -94,6 +97,23 @@ def main() -> int:
         if config.private_key_hex:
             npub = get_public_key(config.private_key_hex)
             print(f"View at: https://njump.me/{npub}")
+        
+        # If AI failed, also post the angry notification
+        if output.ai_failed and output.error_message:
+            print("AI failed - posting angry notification...")
+            try:
+                angry_event_id = publish_note(
+                    content=output.error_message,
+                    relays=config.relays,
+                    private_key_hex=config.private_key_hex,
+                    bunker_uri=config.bunker_uri,
+                    app_key_hex=config.app_key_hex,
+                    update_profile=False,
+                )
+                print(f"Angry notification posted! Event ID: {angry_event_id}")
+            except Exception as e:
+                print(f"Warning: Could not post angry notification: {e}", file=sys.stderr)
+                
     except Exception as e:
         print(f"Error publishing to Nostr: {e}", file=sys.stderr)
         return 1
