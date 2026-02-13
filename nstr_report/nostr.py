@@ -6,6 +6,7 @@ from nostr_sdk import (
     Client,
     EventBuilder,
     Metadata,
+    MetadataRecord,
     SecretKey,
     NostrSigner,
     NostrConnect,
@@ -113,9 +114,11 @@ async def publish_note_async(
 
             # Optionally update profile
             if update_profile:
-                metadata = Metadata()
-                metadata = metadata.set_name(PROFILE_NAME)
-                metadata = metadata.set_about(PROFILE_BIO)
+                record = MetadataRecord(
+                    name=PROFILE_NAME,
+                    about=PROFILE_BIO,
+                )
+                metadata = Metadata.from_record(record)
                 await client.set_metadata(metadata)
 
             # Build and publish the note
