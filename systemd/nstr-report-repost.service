@@ -1,0 +1,19 @@
+[Unit]
+Description=Repost BNOC Daily Summary to Nostr
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/nstr-report --repost
+
+# Load API keys from environment file if it exists
+EnvironmentFile=-%h/.config/nstr-report/env
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nstr-report-repost
+
+[Install]
+WantedBy=default.target

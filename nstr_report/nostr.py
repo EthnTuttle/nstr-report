@@ -5,6 +5,8 @@ from nostr_sdk import (
     Keys,
     Client,
     EventBuilder,
+    Filter,
+    Kind,
     Metadata,
     MetadataRecord,
     SecretKey,
@@ -199,3 +201,56 @@ async def get_bunker_public_key(bunker_uri: str, app_key_hex: str | None = None)
     connect = NostrConnect(uri, app_keys, timeout, None)
     pubkey = await connect.get_public_key()
     return pubkey.to_bech32()
+
+
+async def fetch_latest_note_async(
+    pubkey: str,
+    relays: list[str],
+    contains: str | None = None,
+) -> str | None:
+    """Fetch the latest text note from a pubkey.
+
+    Args:
+        pubkey: Public key (npub or hex)
+        relays: List of relay URLs to query
+        contains: Optional string that must be in the note content
+
+    Returns:
+        Content of the latest matching note, or None if not found
+    """
+    client = Client()
+
+    # Add relays
+    for relay in relays:
+        relay_url = RelayUrl.parse(relay)
+        await client.add_relay(relay_url)
+
+    await client.connect()
+    await asyncio.sleep(2)  # Wait for connections
+
+    # Parse pubkey
+    pk = PublicKey.parse(pubkey)
+
+    # Create filter for text notes (kind 1) from this author
+    # Fetch more if we need to filter by content
+    limit = 20 if contains else 1
+    f = Filter().author(pk).kind(Kind(1)).limit(limit)
+
+    # Fetch events
+    events = await client.fetch_events(f, timedelta(seconds=15))
+
+    await client.disconnect()
+
+    # Get the latest event content (optionally matching contains)
+    if not events.is_empty():
+        for event in events.to_vec():
+            content = event.content()
+            if contains is None or contains in content:
+                return content
+
+    return None
+
+
+def fetch_latest_note(pubkey: str, relays: list[str], contains: str | None = None) -> str | None:
+    """Synchronous wrapper for fetch_latest_note_async."""
+    return asyncio.run(fetch_latest_note_async(pubkey, relays, contains))

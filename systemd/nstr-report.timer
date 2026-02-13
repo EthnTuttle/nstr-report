@@ -1,14 +1,11 @@
 [Unit]
-Description=Run nstr-report daily summary
+Description=Generate nstr-report daily summary at midnight UTC
 Documentation=https://github.com/EthnTuttle/nstr-report
 
 [Timer]
-# Run at 9am and 12pm Eastern Time
-OnCalendar=*-*-* 09:00:00 America/New_York
-OnCalendar=*-*-* 12:00:00 America/New_York
-# Add randomized delay up to 2 minutes
+# Generate fresh summary at midnight UTC
+OnCalendar=*-*-* 00:00:00 UTC
 RandomizedDelaySec=120
-# Run immediately if we missed the last scheduled time
 Persistent=true
 
 [Install]
