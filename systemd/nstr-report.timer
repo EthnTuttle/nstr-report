@@ -1,12 +1,13 @@
 [Unit]
-Description=Run nstr-report daily
-Documentation=https://github.com/your-repo/nstr-report
+Description=Run nstr-report daily summary
+Documentation=https://github.com/EthnTuttle/nstr-report
 
 [Timer]
-# Run daily at 00:00 UTC
-OnCalendar=*-*-* 00:00:00 UTC
-# Add randomized delay up to 5 minutes to avoid thundering herd
-RandomizedDelaySec=300
+# Run at 9am and 12pm Eastern Time
+OnCalendar=*-*-* 09:00:00 America/New_York
+OnCalendar=*-*-* 12:00:00 America/New_York
+# Add randomized delay up to 2 minutes
+RandomizedDelaySec=120
 # Run immediately if we missed the last scheduled time
 Persistent=true
 
