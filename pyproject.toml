@@ -1,0 +1,18 @@
+[project]
+name = "nstr-report"
+version = "0.1.0"
+description = "Daily BNOC activity summary bot for Nostr"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.27.0",
+    "nostr-sdk>=0.35.0",
+    "anthropic>=0.40.0",
+]
+
+[project.scripts]
+nstr-report = "nstr_report.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

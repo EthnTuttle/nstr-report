@@ -1,0 +1,19 @@
+[Unit]
+Description=BNOC Daily Summary Bot for Nostr
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/nstr-report
+
+# Load API keys from environment file if it exists
+EnvironmentFile=-%h/.config/nstr-report/env
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=nstr-report
+
+[Install]
+WantedBy=default.target

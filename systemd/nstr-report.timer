@@ -1,0 +1,14 @@
+[Unit]
+Description=Run nstr-report daily
+Documentation=https://github.com/your-repo/nstr-report
+
+[Timer]
+# Run daily at 00:00 UTC
+OnCalendar=*-*-* 00:00:00 UTC
+# Add randomized delay up to 5 minutes to avoid thundering herd
+RandomizedDelaySec=300
+# Run immediately if we missed the last scheduled time
+Persistent=true
+
+[Install]
+WantedBy=timers.target
