@@ -83,7 +83,7 @@ def main() -> int:
         return 0
 
     # Publish to Nostr
-    print(f"Publishing to {len(config.relays)} relays...")
+    print(f"Publishing to {len(config.relays)} relays: {', '.join(config.relays)}")
     try:
         event_id = publish_note(
             content=output.message,
